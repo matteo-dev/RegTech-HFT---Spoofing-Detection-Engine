@@ -299,3 +299,32 @@ async def red_button():
     for _ in range(50):
         await order_queue.put({"trader_id": trader, "action": "CANCEL", "ticker": "CO2_QUOTA", "qty": 9000, "price": 105.0})
     return {"status": "Stress test injecté."}
+
+# Route API pour reset total
+@app.post("/api/reset")
+async def reset_system():
+    
+    # 1. Purge la base de données SQLite
+    cursor.execute("DELETE FROM audit_trail")
+    db_conn.commit()
+    
+    # 2. Reset des variables RAM
+    market_state["current_price"] = 100.0
+    market_state["daily_volume"] = 0
+    market_state["history"].clear()
+    
+    order_book["bids"].clear()
+    order_book["asks"].clear()
+    
+    trader_history.clear()
+    alerts_log.clear()
+    
+    # 3. Vidage de la queue asynchrone des ordres en attente
+    while not order_queue.empty():
+        try:
+            order_queue.get_nowait()
+            order_queue.task_done()
+        except asyncio.QueueEmpty:
+            break
+            
+    return {"status": "System reset successful"}
