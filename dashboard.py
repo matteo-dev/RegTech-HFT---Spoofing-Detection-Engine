@@ -43,6 +43,16 @@ def trigger_red_button():
     except:
         st.error("Unable to reach the server to launch the attack.")
 
+def trigger_reset():
+    try:
+        requests.post(f"{API_URL}/reset")
+        st.toast("🧹 System reset: All data cleared!")
+        time.sleep(1)
+        st.rerun()
+    except:
+        st.error("Unable to reach the server for reset.")
+
+st.sidebar.button("🧹 Reset System", type="secondary", on_click=trigger_reset)
 
 # Entête et description de l'application
 st.title("⚖️ RegTech Engine - HFT Spoofing Detection")
