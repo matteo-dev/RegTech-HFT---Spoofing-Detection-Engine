@@ -179,24 +179,34 @@ async def compliance_engine(trader_id: str):
 
 
 # 5. LES BOTS AUTONOMES (Générateurs de Vélocité)
-
-# Fonction asynchrone qui simule un trader sain apportant de la liquidité au marché
-async def legitimate_bot(bot_id: int):
-
-    # Chaque bot sain génère des ordres aléatoires toutes les 0.1 à 1.5 secondes pour simuler un marché actif
-    while True:
-        await asyncio.sleep(random.uniform(0.1, 1.5))
-        price_variance = random.uniform(-0.5, 0.5)
-        action = random.choices(["PLACE_BID", "PLACE_ASK", "CANCEL"], weights=[45, 45, 10], k=1)[0]
+    
+    async def legitimate_bot(bot_id: int):
+        while True:
+            await asyncio.sleep(random.uniform(0.1, 1.5))
+            price_variance = random.uniform(-0.5, 0.5)
         
-        # On envoie l'ordre dans la queue asynchrone pour traitement par le moteur de marché
-        await order_queue.put({
-            "trader_id": f"HFT_BOT_{bot_id}",
-            "action": action,
-            "ticker": "CO2_QUOTA",
-            "qty": random.randint(10, 100),
-            "price": round(market_state["current_price"] + price_variance, 2)
-        })
+            # Calcul du nouveau prix théorique
+            raw_price = market_state["current_price"] + price_variance
+        
+            # Application de limites réalistes pour un quota CO2 (ex: min 20€, max 250€)
+            if raw_price < 20.0:
+                # Force le prix à remonter si on touche le plancher
+                new_price = 20.0 + abs(price_variance)
+            elif raw_price > 250.0:
+                # Force le prix à descendre si on touche le plafond
+                new_price = 250.0 - abs(price_variance)
+            else:
+                new_price = raw_price
+
+            action = random.choices(["PLACE_BID", "PLACE_ASK", "CANCEL"], weights=[45, 45, 10], k=1)[0]
+        
+            await order_queue.put({
+                "trader_id": f"HFT_BOT_{bot_id}",
+                "action": action,
+                "ticker": "CO2_QUOTA",
+                "qty": random.randint(10, 100),
+                "price": round(new_price, 2)
+            })
 
 # Fonction asynchrone qui simule un bot malveillant effectuant des attaques de spoofing furtives
 async def autonomous_spoofer():
@@ -222,8 +232,9 @@ async def autonomous_spoofer():
         
         # Phase 2 : Le mur de Spoofing 
 
-        # On place un mur de bid à un prix légèrement inférieur au prix actuel pour inciter les autres traders à vendre
-        spoof_price = market_state["current_price"] - 2.5
+        # On place un mur de bid à un prix légèrement inférieur, 
+        # tout en s'assurant qu'il ne descende jamais sous 10.0 €
+        spoof_price = round(max(10.0, market_state["current_price"] - 2.5), 2)
 
         # On choisit une quantité importante pour le mur de spoofing (entre 3000 et 5000 unités)
         spoof_qty = random.randint(3000, 5000)
